@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+build/
+dist/
+.cache/
+.ruff_cache/
+.DS_Store
+develop-eggs/
+.Python
+.venv/
+.mypy_cache/
+venv/
+htmlcov/
+.pytest_cache/
