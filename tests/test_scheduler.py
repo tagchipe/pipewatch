@@ -36,6 +36,13 @@ def test_get_missing_job(scheduler):
     assert scheduler.get("nope") is None
 
 
+def test_register_duplicate_name_raises(scheduler):
+    """Registering two jobs with the same name should raise ValueError."""
+    scheduler.register("dup", 10, lambda: None)
+    with pytest.raises(ValueError, match="dup"):
+        scheduler.register("dup", 20, lambda: None)
+
+
 def test_job_runs_fn(scheduler):
     counter = {"n": 0}
 
