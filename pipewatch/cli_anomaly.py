@@ -19,6 +19,15 @@ def _demo_detector() -> tuple[AnomalyDetector, list[PipelineMetric]]:
     return detector, probes
 
 
+def _format_result(r) -> str:
+    """Format a single anomaly result as a human-readable string."""
+    flag = "ANOMALY" if r.is_anomaly else "OK"
+    return (
+        f"[{flag}] {r.pipeline}/{r.metric_name} "
+        f"value={r.value} mean={r.mean:.2f} z={r.z_score:.2f}"
+    )
+
+
 @click.group()
 def anomaly_cli():
     """Anomaly detection commands."""
@@ -43,10 +52,6 @@ def check_cmd(fmt: str, only_anomalies: bool):
         click.echo(json.dumps([r.to_dict() for r in results], indent=2))
     else:
         for r in results:
-            flag = "ANOMALY" if r.is_anomaly else "OK"
-            click.echo(
-                f"[{flag}] {r.pipeline}/{r.metric_name} "
-                f"value={r.value} mean={r.mean:.2f} z={r.z_score:.2f}"
-            )
+            click.echo(_format_result(r))
     if any(r.is_anomaly for r in results):
         raise SystemExit(1)
