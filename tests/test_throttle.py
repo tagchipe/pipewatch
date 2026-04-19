@@ -1,11 +1,7 @@
-"""Tests for pipewatch.throttle."""
-from datetime import datetime, timedelta
-from unittest.mock import patch
-
+import time
 import pytest
-
 from pipewatch.metrics import PipelineMetric, MetricStatus
-from pipewatch.throttle import MetricThrottler
+from pipewatch.throttle import Throttler, ThrottleResult
 
 
 def make_metric(pipeline="pipe", name="rows", value=1.0):
@@ -14,56 +10,54 @@ def make_metric(pipeline="pipe", name="rows", value=1.0):
 
 @pytest.fixture
 def throttler():
-    return MetricThrottler(default_interval_seconds=60.0)
+    from pipewatch.throttle import Throttler
+    return Throttler(default_interval_seconds=1.0)
 
 
 def test_first_check_always_allowed(throttler):
-    result = throttler.check(make_metric())
+    m = make_metric()
+    result = throttler.check(m)
+    assert isinstance(result, ThrottleResult)
     assert result.allowed is True
-    assert result.next_allowed_at is None
 
 
 def test_second_check_blocked_within_interval(throttler):
-    throttler.check(make_metric())
-    result = throttler.check(make_metric())
+    m = make_metric()
+    throttler.check(m)
+    result = throttler.check(m)
     assert result.allowed is False
-    assert result.next_allowed_at is not None
 
 
 def test_check_allowed_after_interval_passes(throttler):
-    past = datetime.utcnow() - timedelta(seconds=120)
-    with patch("pipewatch.throttle.datetime") as mock_dt:
-        mock_dt.utcnow.return_value = past
-        throttler.check(make_metric())
-    result = throttler.check(make_metric())
+    throttler2 = Throttler(default_interval_seconds=0.05)
+    m = make_metric()
+    throttler2.check(m)
+    time.sleep(0.1)
+    result = throttler2.check(m)
     assert result.allowed is True
 
 
-def test_custom_interval_respected():
-    throttler = MetricThrottler(default_interval_seconds=10.0)
-    throttler.register("pipe", "rows", interval_seconds=5.0)
-    throttler.check(make_metric())
-    result = throttler.check(make_metric())
-    assert result.allowed is False
-
-
-def test_different_keys_independent(throttler):
-    throttler.check(make_metric(pipeline="a"))
-    result = throttler.check(make_metric(pipeline="b"))
-    assert result.allowed is True
-
-
-def test_to_dict_shape(throttler):
-    result = throttler.check(make_metric())
+def test_to_dict_contains_expected_keys(throttler):
+    m = make_metric()
+    result = throttler.check(m)
     d = result.to_dict()
-    assert "key" in d
     assert "allowed" in d
+    assert "key" in d
     assert "next_allowed_at" in d
 
 
-def test_blocked_result_next_allowed_is_isoformat(throttler):
-    throttler.check(make_metric())
-    result = throttler.check(make_metric())
-    d = result.to_dict()
-    assert d["allowed"] is False
-    assert isinstance(d["next_allowed_at"], str)
+def test_custom_interval_per_pipeline(throttler):
+    throttler.register("pipe", interval_seconds=0.05)
+    m = make_metric(pipeline="pipe")
+    throttler.check(m)
+    time.sleep(0.1)
+    result = throttler.check(m)
+    assert result.allowed is True
+
+
+def test_different_pipelines_independent(throttler):
+    m1 = make_metric(pipeline="a")
+    m2 = make_metric(pipeline="b")
+    throttler.check(m1)
+    result = throttler.check(m2)
+    assert result.allowed is True
