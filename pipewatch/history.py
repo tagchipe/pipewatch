@@ -36,12 +36,20 @@ class MetricHistory:
             return "down"
         return "stable"
 
+    def average(self) -> Optional[float]:
+        """Return the mean value of all recorded entries, or None if empty."""
+        vals = self.values()
+        if not vals:
+            return None
+        return sum(vals) / len(vals)
+
     def to_dict(self) -> dict:
         return {
             "pipeline": self.pipeline,
             "name": self.name,
             "count": len(self._entries),
             "latest": self.latest().value if self.latest() else None,
+            "average": self.average(),
             "trend": self.trend(),
             "values": self.values(),
         }
